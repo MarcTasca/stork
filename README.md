@@ -58,7 +58,7 @@ The `examples` directory contains notebooks and Python scripts that contain exam
 - **[03_Deep_ConvSNN_SHD](examples/03_Deep_ConvSNN_SHD.ipynb):** Here we provide an example of a deep recurrent convolutional SNN on the SHD dataset. This example will introduce the use of [layer](stork/layers.py) to create convolutional layers.
 - **[04_DalesLaw_SNN_SHD](examples/04_DalesLaw_SNN_SHD.ipynb):** This notebook demonstrates how to implement a Dalian network, meaning networks with separate populations of excitatory and inhibitory neurons (i.e. the synaptic connections are sign constrained), by using the `DalianLayer` class from the [layer](stork/layers.py) module.
 - **[05_Deep_ConvSNN_DVS-Gestures](examples/05_Deep_ConvSNN_DVS-Gestures.ipynb):** Similar to **[03_Deep_ConvSNN_SHD](examples/03_Deep_ConvSNN_SHD.ipynb):**, but for the [DVS128 Gesture](https://research.ibm.com/interactive/dvsgesture/) dataset.
-- **[06_PeriodicReset_SHD](examples/06_PeriodicReset_SHD.ipynb):** This example compares dense LIF, homogeneous PIF, and heterogeneous PIF networks on SHD and reports analytical effective operation counts. The [periodic-reset package README](stork/periodic_reset/README.md) gives the model equations, initializer derivation, and exact counting conventions.
+- **[06_PeriodicReset_SHD](examples/06_PeriodicReset_SHD.ipynb):** This example compares dense LIF, homogeneous PIF, and heterogeneous PIF networks on SHD and reports analytical effective operation counts based on the [EFLOP framework of Narduzzi et al. (2025)](https://doi.org/10.1088/2634-4386/addee8). The [periodic-reset package README](stork/periodic_reset/README.md) gives the model equations, initializer derivation, and exact counting conventions.
 
 
 ## Funding

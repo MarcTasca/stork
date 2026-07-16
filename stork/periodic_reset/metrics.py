@@ -18,6 +18,11 @@ class EffectiveFlops:
 class EffectiveFlopsCounter:
     """Count operations that are active for a particular spike trace.
 
+    The zero-skipping convention follows Narduzzi et al., "EFLOP: a
+    sparsity-aware metric for evaluating computational cost in spiking and
+    non-spiking neural networks" (2025), doi:10.1088/2634-4386/addee8. The
+    periodic-reset and non-leaky-readout rules are extensions for this package.
+
     The counter consumes explicit tensors and has no dependency on monitor
     ordering, model architecture, datasets, or a particular accelerator.
     """

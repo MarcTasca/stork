@@ -28,10 +28,10 @@ reset step is discarded, while the spike returned on that step is determined
 from the pre-update membrane \(u_{n,j}\).
 
 For simulation step \(\Delta t\), continuous period \(\tau_j>0\), and sampled
-phase \(\phi_j\sim\operatorname{Uniform}[0,1)\), the implementation uses
+phase \(\phi_j\sim\mathrm{Uniform}[0,1)\), the implementation uses
 
 $$
-p_j=\max\!\left(1,\operatorname{round}(\tau_j/\Delta t)\right),
+p_j=\max\!\left(1,\mathrm{round}(\tau_j/\Delta t)\right),
 \qquad
 o_j=\lfloor \phi_jp_j\rfloor,
 $$
@@ -48,11 +48,11 @@ exactly \(\tau_j\). `PIFGroup` sets every \(\tau_j=\tau\).
 `HeterogeneousPIFGroup` samples
 
 $$
-\tau_j\sim\operatorname{Gamma}\!\left(k,\text{rate}=k/\tau\right),
+\tau_j\sim\mathrm{Gamma}\!\left(k,\text{rate}=k/\tau\right),
 \qquad
 \mathbb E[\tau_j]=\tau,
 \qquad
-\operatorname{Var}(\tau_j)=\tau^2/k,
+\mathrm{Var}(\tau_j)=\tau^2/k,
 $$
 
 where `concentration` is \(k\). The subsequent rounding changes the mean of
@@ -66,17 +66,17 @@ matching. Its continuous-time derivation assumes:
 - \(N\) independent presynaptic Poisson processes, each with rate \(\nu\);
 - a fixed dense weight row \(w_1,\ldots,w_N\);
 - no output spike during the window; and
-- an observation age \(A\sim\operatorname{Uniform}(0,\tau)\), independent of
+- an observation age \(A\sim\mathrm{Uniform}(0,\tau)\), independent of
   the input.
 
-Conditional on \(A=a\), let \(K_i(a)\sim\operatorname{Poisson}(\nu a)\) and
+Conditional on \(A=a\), let \(K_i(a)\sim\mathrm{Poisson}(\nu a)\) and
 \(U(a)=\sum_i w_iK_i(a)\). With
 \(S_1=\sum_iw_i\) and \(S_2=\sum_iw_i^2\), independence gives
 
 $$
 \mathbb E[U\mid A=a,w]=\nu aS_1,
 \qquad
-\operatorname{Var}(U\mid A=a,w)=\nu aS_2.
+\mathrm{Var}(U\mid A=a,w)=\nu aS_2.
 $$
 
 Averaging these two conditional moments over reset phase yields
@@ -85,7 +85,7 @@ $$
 \mathbb E_A\!\left[\mathbb E[U\mid A,w]\right]
 =\frac{\nu\tau}{2}S_1,
 \qquad
-\mathbb E_A\!\left[\operatorname{Var}(U\mid A,w)\right]
+\mathbb E_A\!\left[\mathrm{Var}(U\mid A,w)\right]
 =\frac{\nu\tau}{2}S_2.
 $$
 
@@ -114,7 +114,7 @@ on age. The full variance over both Poisson input and uniformly sampled age is,
 for a fixed realized weight row,
 
 $$
-\operatorname{Var}_{A,K}(U\mid w)
+\mathrm{Var}_{A,K}(U\mid w)
 =\frac{\nu\tau}{2}S_2
 +\frac{\nu^2\tau^2}{12}S_1^2.
 $$
@@ -161,7 +161,7 @@ period \(p_j\), the recorded integration age \(K_j\) is uniform on
 $$
 \mathbb E[K_j]=\frac{p_j-1}{2},
 \qquad
-\operatorname{Var}(K_j)=\frac{p_j^2-1}{12}.
+\mathrm{Var}(K_j)=\frac{p_j^2-1}{12}.
 $$
 
 For a realized weight row with sums \(S_{1,j}\) and \(S_{2,j}\), the exact
@@ -172,7 +172,7 @@ $$
 $$
 
 $$
-\operatorname{Var}(U_j)
+\mathrm{Var}(U_j)
 =q(1-q)\frac{p_j-1}{2}S_{2,j}
 +q^2\frac{p_j^2-1}{12}S_{1,j}^2.
 $$
@@ -182,6 +182,15 @@ per-neuron means and standard deviations, exactly matching its empirical
 summary statistic.
 
 ## Effective-operation definitions
+
+The EFLOP name and zero-skipping principle follow
+[Narduzzi, Zenke, Liu, and Dunbar (2025)](https://doi.org/10.1088/2634-4386/addee8).
+Their framework counts arithmetic and activation operations involving nonzero
+operands, accounts for both weight and activation sparsity, and excludes memory
+access. `EffectiveFlopsCounter` specializes that framework to explicit Stork
+traces and extends it with periodic-reset PIF and non-leaky-readout rules. The
+equations below define the exact convention implemented here; they should not
+be read as equations quoted verbatim from the paper.
 
 The counter consumes explicit tensors in `(batch, time, ...)` layout. Define
 
@@ -240,3 +249,8 @@ analytical effective operations per test sample.
 
 The broader fluctuation-driven initialization framework is described by
 [Rossbroich, Gygax, and Zenke (2022)](https://arxiv.org/abs/2206.10226).
+The effective-operation methodology is based on
+[Narduzzi, S., Zenke, F., Liu, S.-C., and Dunbar, L. A. (2025), *EFLOP: a
+sparsity-aware metric for evaluating computational cost in spiking and
+non-spiking neural networks*, Neuromorphic Computing and Engineering 5(3),
+034011](https://doi.org/10.1088/2634-4386/addee8).

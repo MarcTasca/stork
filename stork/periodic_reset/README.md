@@ -61,8 +61,13 @@ $$
 \mathrm{Var}(U(t)\mid w)=\nu t\sum_i w_i^2.
 $$
 
-This is a compound-Poisson accumulation. A spike or periodic reset truncates
-it and starts a new window.
+Given a fixed weight row, this is a weighted Poisson accumulation. (Conditional
+on that row, it is a compound Poisson process with the empirical weights as its
+jump distribution.) The weights are sampled once at initialization and then
+stay fixed: they are not resampled at every input spike. Across random weight
+initializations, the process is therefore a mixture of these conditional
+processes. A spike or periodic reset ends the current accumulation window and
+starts a new one.
 
 ### Why zero mean is not enough
 
@@ -111,10 +116,32 @@ deviation. The dashed line marks the firing threshold.
 
 ### Choosing the weight scale
 
-The initializer also needs a finite integration time. With reset offsets spread
-across the layer, the average time since reset is $\tau/2$. Matching a target
-membrane mean $\mu_u$ and standard deviation $\sigma_u$ gives the parameters
-used by the implementation:
+The fluctuation-driven initializer for LIF neurons chooses the weight moments
+so that the stationary membrane distribution has a target mean and variance
+[Rossbroich et al. (2022)](#references). The PIF membrane is not stationary
+inside a reset window: its mean and variance change with the time $t$ since the
+last reset. After recentering has removed the random row drift, the initializer
+uses the following large-fan-in approximation:
+
+$$
+\mathbb{E}[U(t)]=N\mu_w\nu t,
+\qquad
+\mathrm{Var}(U(t))=N\nu t(\mu_w^2+\sigma_w^2).
+$$
+
+There is therefore no single stationary value to match. Instead, the PIF
+initializer matches a target mean $\mu_u$ and variance $\sigma_u^2$ on average
+over one reset period:
+
+$$
+\mu_u=\frac{1}{\tau}\int_0^\tau \mathbb{E}[U(t)]\,dt,
+\qquad
+\sigma_u^2=\frac{1}{\tau}\int_0^\tau \mathrm{Var}(U(t))\,dt.
+$$
+
+Both moments are proportional to $t$, whose average over the interval is
+$\tau/2$. Solving the two equations gives the parameters used by the
+implementation:
 
 $$
 \mu_w=\frac{2\mu_u}{N\nu\tau},
@@ -122,11 +149,12 @@ $$
 \sigma_w^2=\frac{2\sigma_u^2}{N\nu\tau}-\mu_w^2.
 $$
 
-The reset offsets are used to desynchronize neurons and the mean age $\tau/2$
-sets the fluctuation scale. They are not the reason for recentering. The formula
-uses $N$, while exact recentering gives the $N-1$ factor above. This small
-finite-fan-in correction is checked in the notebook using the realized weight
-rows.
+The factor $\tau/2$ comes from this time average, not from the random reset
+offsets. Those offsets only desynchronize neurons. They are also not the reason
+for recentering: recentering removes the drift caused by the realized sum of a
+finite weight row. The formula uses $N$, while exact recentering gives the
+$N-1$ factor above. This small finite-fan-in correction is checked in the
+notebook using the realized weight rows.
 
 The requested variance must be positive. For a heterogeneous PIF layer, the
 initializer uses the population mean $\tau$ rather than a separate value for

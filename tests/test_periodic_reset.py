@@ -53,6 +53,31 @@ class PeriodicResetTests(unittest.TestCase):
         self.assertFalse(hasattr(group, "crit_accum"))
         self.assertFalse(hasattr(group, "grad_accum"))
 
+    def test_spike_reset_clears_membrane_and_discards_input(self):
+        for diff_reset in (False, True):
+            with self.subTest(diff_reset=diff_reset):
+                group = PIFGroup(tau=20e-3, shape=1, diff_reset=diff_reset)
+                group.configure(
+                    batch_size=1,
+                    nb_steps=2,
+                    time_step=2e-3,
+                    device=torch.device("cpu"),
+                    dtype=torch.float32,
+                )
+                group.offset.fill_(5)
+                group.reset_state()
+                group.mem.fill_(1.1)
+
+                group.input.fill_(0.4)
+                group.forward()
+                self.assertEqual(float(group.out.item()), 1.0)
+                self.assertEqual(float(group.mem.item()), 0.0)
+
+                group.input.fill_(0.2)
+                group.forward()
+                self.assertEqual(float(group.out.item()), 0.0)
+                self.assertAlmostEqual(float(group.mem.item()), 0.2, places=7)
+
     def test_phase_is_preserved_when_time_step_changes(self):
         group = PIFGroup(tau=6e-3, shape=1)
         group.phase.fill_(0.5)
@@ -91,6 +116,18 @@ class PeriodicResetTests(unittest.TestCase):
         initializer.initialize(connection)
         row_means = connection.op.weight.detach().mean(dim=1)
         self.assertLess(float(row_means.abs().max()), 1e-7)
+
+    def test_initializer_rejects_non_positive_weight_variance(self):
+        connection = Connection(InputGroup(2), PIFGroup(tau=1.0, shape=1))
+        initializer = PeriodicResetFluctuationDrivenInitializer(
+            nu=1.0,
+            tau=1.0,
+            mu_u=10.0,
+            sigma_u=1.0,
+        )
+
+        with self.assertRaisesRegex(ValueError, "non-positive variance"):
+            initializer.initialize(connection)
 
     def test_eflops_counter_counts_spikes_and_periodic_updates(self):
         counter = EffectiveFlopsCounter()

@@ -8,6 +8,11 @@ from stork.initializers import Initializer
 class PeriodicResetFluctuationDrivenInitializer(Initializer):
     """Fluctuation-driven initialization for periodic-reset IF groups.
 
+    Under independent Poisson input and a uniformly observed integration age,
+    the parameters match the phase-averaged conditional membrane mean and
+    variance. They do not include the variance of the conditional mean across
+    reset phase; see ``stork/periodic_reset/README.md`` for the derivation.
+
     ``tau`` is the scalar mean reset period in seconds. The same population
     mean is used for homogeneous and heterogeneous destination groups.
     """

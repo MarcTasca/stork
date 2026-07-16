@@ -3,7 +3,7 @@
 # Stork
 
 Stork is a library designed for the training of spiking neural networks (SNNs). In contrast to conventional deep learning methods, SNNs operate on spikes instead of continuous activation functions, this is why stork extends PyTorch's auto-differentiation capabilities with surrogate gradients (<a href="https://direct.mit.edu/neco/article-abstract/30/6/1514/8378/SuperSpike-Supervised-Learning-in-Multilayer?redirectedFrom=fulltext">Zenke & Ganguli, 2018</a>) to enable the training of SNNs with backpropagation through time (BPTT).  
-Stork supports leaky integrate-and-fire (LIF) neurons including adaptive LIF neurons and different kinds of synaptic connections allowing to use e.g. Dalian and Convolutional layers as well as constructing network architectures with recurrent or skip connections. For each neuron group, customizable activity regularizers are available to e.g. apply homeostatic plasticity.  
+Stork supports leaky integrate-and-fire (LIF) neurons including adaptive LIF neurons, as well as homogeneous and heterogeneous periodic reset-and-fire (PIF) neurons. It provides different kinds of synaptic connections for constructing Dalian, convolutional, recurrent, and skip-connected networks. For each neuron group, customizable activity regularizers are available to e.g. apply homeostatic plasticity.
 Furthermore, stork uses per default initialization in the fluctuation-driven regime, what enhances SNN training especially in deep networks.
 
 
@@ -58,6 +58,7 @@ The `examples` directory contains notebooks and Python scripts that contain exam
 - **[03_Deep_ConvSNN_SHD](examples/03_Deep_ConvSNN_SHD.ipynb):** Here we provide an example of a deep recurrent convolutional SNN on the SHD dataset. This example will introduce the use of [layer](stork/layers.py) to create convolutional layers.
 - **[04_DalesLaw_SNN_SHD](examples/04_DalesLaw_SNN_SHD.ipynb):** This notebook demonstrates how to implement a Dalian network, meaning networks with separate populations of excitatory and inhibitory neurons (i.e. the synaptic connections are sign constrained), by using the `DalianLayer` class from the [layer](stork/layers.py) module.
 - **[05_Deep_ConvSNN_DVS-Gestures](examples/05_Deep_ConvSNN_DVS-Gestures.ipynb):** Similar to **[03_Deep_ConvSNN_SHD](examples/03_Deep_ConvSNN_SHD.ipynb):**, but for the [DVS128 Gesture](https://research.ibm.com/interactive/dvsgesture/) dataset.
+- **[06_PeriodicReset_SHD](examples/06_PeriodicReset_SHD.ipynb):** This example compares dense LIF, homogeneous PIF, and heterogeneous PIF networks on SHD and reports analytical effective operation counts.
 
 
 ## Funding

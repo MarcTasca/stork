@@ -12,5 +12,6 @@ from . import monitors
 from . import optimizers
 from . import layers
 from . import initializers
+from . import periodic_reset
 
 __version__ = "0.1.0"

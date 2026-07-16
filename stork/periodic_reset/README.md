@@ -41,38 +41,44 @@ with mean $\tau$ and concentration $k$.
 ## Why PIF needs a different initializer
 
 Stork's LIF initializer is based on an exponentially decaying response. PIF
-does not have that response. It sums events from its last periodic reset, so
-the relevant integration window has length $\tau$.
+does not have that response. It sums events since its last reset, so a small
+imbalance in its inputs can build up instead of leaking away.
 
 Assume $N$ independent input neurons, each firing as a Poisson process with
-rate $\nu$. At age $a$ after a reset, the membrane is
+rate $\nu$. At time $t$ after a reset, and before the PIF neuron fires, its
+membrane is
 
 $$
-U(a)=\sum_{i=1}^{N}w_iK_i(a),
-\qquad K_i(a)\sim\mathrm{Poisson}(\nu a).
+U(t)=\sum_{i=1}^{N}w_iK_i(t),
+\qquad K_i(t)\sim\mathrm{Poisson}(\nu t).
 $$
 
-For fixed weights, this is a compound-Poisson sum. Its conditional moments are
+For a fixed weight row,
 
 $$
-\mathbb{E}[U\mid a]=\nu a\sum_i w_i,
+\mathbb{E}[U(t)\mid w]=\nu t\sum_i w_i,
 \qquad
-\mathrm{Var}(U\mid a)=\nu a\sum_i w_i^2.
+\mathrm{Var}(U(t)\mid w)=\nu t\sum_i w_i^2.
 $$
 
-If the reset phase is uniform, the mean age is $\tau/2$. Matching a target
-membrane mean $\mu_u$ and standard deviation $\sigma_u$ gives the initializer
-used here:
+This is a compound-Poisson accumulation. A spike or periodic reset truncates
+it and starts a new window.
+
+### Why zero mean is not enough
+
+Suppose the weights are sampled independently with mean $\mu_w$ and variance
+$\sigma_w^2$. Across sampled weight rows,
 
 $$
-\mu_w=\frac{2\mu_u}{N\nu\tau},
-\qquad
-\sigma_w^2=\frac{2\sigma_u^2}{N\nu\tau}-\mu_w^2.
+\mathrm{Var}(U(t))
+=N\nu t(\mu_w^2+\sigma_w^2)
++N\sigma_w^2(\nu t)^2.
 $$
 
-The requested variance must be positive. For a heterogeneous PIF layer, the
-initializer uses the population mean $\tau$ rather than a separate value for
-every neuron.
+Even when $\mu_w=0$, a finite sampled row does not usually sum to exactly
+zero. The non-leaky membrane accumulates this small error. Rows with a positive
+sum drift up, while rows with a negative sum drift down. The last term above
+is the variance caused by these different row sums, and it grows as $t^2$.
 
 ### Recentring the weights
 
@@ -83,16 +89,62 @@ $$
 w_i \leftarrow w_i-\frac{1}{N}\sum_k w_k+\mu_w.
 $$
 
-For the usual choice $\mu_u=0$, this makes $\sum_i w_i=0$ for each neuron.
-The compound-Poisson sum then has no phase-dependent drift: a neuron does not
-start each reset window with a systematic push up or down. Periodic resets
-limit how long fluctuations can accumulate.
+For the usual choice $\mu_u=0$, this makes $\sum_i w_i=0$ exactly for every
+neuron. It removes the drift and the $t^2$ term while keeping the fluctuations
+from the Poisson input. If the original sampled weights have variance
+$\sigma_w^2$, the exact centered result is
+
+$$
+\mathrm{Var}(U_{\mathrm{centered}}(t))
+=\nu t(N-1)\sigma_w^2.
+$$
+
+The centered variance is linear in time, so its standard-deviation envelope
+grows as $\sqrt{t}$ instead of roughly linearly.
+
+| independently sampled weights | row-recentered weights |
+|:--:|:--:|
+| ![Membrane trajectories with uncentered weights](assets/uncentered_membrane_dynamics.png) | ![Membrane trajectories with recentered weights](assets/centered_membrane_dynamics.png) |
+
+The thin lines are membrane trajectories and the shaded area is $\pm1$ standard
+deviation. The dashed line marks the firing threshold.
+
+### Choosing the weight scale
+
+The initializer also needs a finite integration time. With reset offsets spread
+across the layer, the average time since reset is $\tau/2$. Matching a target
+membrane mean $\mu_u$ and standard deviation $\sigma_u$ gives the parameters
+used by the implementation:
+
+$$
+\mu_w=\frac{2\mu_u}{N\nu\tau},
+\qquad
+\sigma_w^2=\frac{2\sigma_u^2}{N\nu\tau}-\mu_w^2.
+$$
+
+The reset offsets are used to desynchronize neurons and the mean age $\tau/2$
+sets the fluctuation scale. They are not the reason for recentering. The formula
+uses $N$, while exact recentering gives the $N-1$ factor above. This small
+finite-fan-in correction is checked in the notebook using the realized weight
+rows.
+
+The requested variance must be positive. For a heterogeneous PIF layer, the
+initializer uses the population mean $\tau$ rather than a separate value for
+every neuron.
 
 This combination is meant to keep activity in a useful range instead of
 producing silent neurons or neurons that spike at every step. It is not a
 guarantee for every dataset or trained model, so the notebook measures it. It
 plots the test-set firing rate of every hidden neuron and reports the exact
 number of zero-rate and always-spiking neurons.
+
+The following snapshots are qualitative examples from the dense, unpruned
+500-epoch SHD experiments. Each column is one test sample and each row is one
+hidden layer. The notebook provides the quantitative firing-rate comparison.
+
+| LIF | PIF |
+|:--:|:--:|
+| ![LIF hidden-layer activity on five SHD samples](assets/lif_activity_snapshot.png) | ![PIF hidden-layer activity on five SHD samples](assets/pif_activity_snapshot.png) |
 
 ```python
 from stork.periodic_reset import (

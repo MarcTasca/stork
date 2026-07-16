@@ -174,6 +174,18 @@ hidden layer. The notebook provides the quantitative firing-rate comparison.
 |:--:|:--:|
 | ![LIF hidden-layer activity on five SHD samples](assets/lif_activity_snapshot.png) | ![PIF hidden-layer activity on five SHD samples](assets/pif_activity_snapshot.png) |
 
+### 50-epoch SHD example
+
+The executed notebook contains one dense 50-epoch run for each model, using
+seed 42 and the same SHD split. These results describe this run; they are not
+confidence intervals or significance tests.
+
+| model | test accuracy | total EFLOPs/sample | reduction vs LIF |
+|:--|--:|--:|--:|
+| LIF | 67.84% | 2,659,241 | baseline |
+| PIF | 72.17% | 1,574,130 | 40.81% |
+| heterogeneous PIF | 73.28% | 1,573,953 | 40.81% |
+
 ```python
 from stork.periodic_reset import (
     NonLeakyReadoutGroup,

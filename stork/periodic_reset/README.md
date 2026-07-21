@@ -11,7 +11,7 @@ This package provides:
 
 ## PIF dynamics
 
-Let $u_{n,j}$ be the membrane of neuron $j$ before step $n$, $I_{n,j}$ its input, and $r_{n,j}$ the scheduled-reset flag. The default forward update is
+Let $u_{n,j}$ be the membrane of neuron $j$ before step $n$, $I_{n,j}$ its input, $s_{n,j}$ the spike and $r_{n,j}$ the scheduled-reset flag. The default forward update is
 
 $$
 s_{n,j}=\mathbf{1}[u_{n,j}>\theta_j],
@@ -19,15 +19,21 @@ s_{n,j}=\mathbf{1}[u_{n,j}>\theta_j],
 u_{n+1,j}=(u_{n,j}+I_{n,j})(1-s_{n,j})(1-r_{n,j}).
 $$
 
-The neuron therefore resets after a spike or at its next reset time. Input o a reset step is discarded. `diff_reset` only changes the backward path; it does not change this forward update.
+Therefore, the neuron is reset to zero after a spike or at a scheduled reset. 
 
-The requested period $\tau_j$ is converted to an integer number of steps:
+To calculate the scheduled reset we convert the neuron reset period $\tau_j$ to an integer number of simulation steps $p_j$ and, to avoid simultaneous resets, we assign at every neuron $j$ an independent phase:
 
 $$
-p_j=\max(1,\mathrm{round}(\tau_j/\Delta t)).
+\phi_j \sim U \\{0,\ldots,p_j-1\\}.
 $$
 
-Each neuron receives a random phase in $0,\ldots,p_j-1$, which spreads reset events across time. `PIFGroup` uses one shared value of $\tau$. `HeterogeneousPIFGroup` draws one $\tau_j$ per neuron from a Gamma distribution with mean $\tau$ and concentration $k$.
+Finally, to calculate the reset flag, we have to count the number of resets already happened $n_{r,j}$, such that:
+
+$$
+r_{n,j}=\mathbf{1}[n\ge\phi_j+(n_{r,j}+1)p_j].
+$$
+
+`PIFGroup` uses one shared value of $\tau$. `HeterogeneousPIFGroup` draws one $\tau_j$ per neuron from a Gamma distribution with mean $\tau$ and concentration $k$.
 
 ## Why PIF needs a different initializer
 

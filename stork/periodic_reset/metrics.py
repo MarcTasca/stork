@@ -143,9 +143,10 @@ class EffectiveFlopsCounter:
         """Count leaky integrate-and-fire neuron operations.
 
         Tensors use ``(batch, time, ...)`` layout. The count follows the LIF
-        state-update convention of five operations per active neuron and one
-        per incoming update, with three operations saved when an inactive
-        neuron receives an update directly.
+        state-update convention of five operations when either the membrane
+        or incoming update is active, plus one operation per incoming update.
+        Three operations are saved when an inactive membrane receives an
+        update directly.
         """
 
         if membranes.ndim < 2:
@@ -153,9 +154,10 @@ class EffectiveFlopsCounter:
         if updating.shape != membranes.shape:
             raise ValueError("updating must have the same shape as membranes")
 
-        active = membranes.ne(0)
         updating = updating.to(device=membranes.device, dtype=torch.bool)
-        inactive_but_updating = updating & ~active
+        membrane_active = membranes.ne(0)
+        active = membrane_active | updating
+        inactive_but_updating = updating & ~membrane_active
         operations = (
             5 * active.sum()
             + updating.sum()

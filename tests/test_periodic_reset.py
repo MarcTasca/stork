@@ -260,10 +260,22 @@ class PeriodicResetTests(unittest.TestCase):
         operations = counter.count_lif_neurons(membranes, updating)
         result = counter.count(lif_layers=[(membranes, updating)])
 
-        # Four active neurons and three updates, including one direct update
-        # of an inactive neuron: 5 * 4 + 3 - 3 * 1.
-        self.assertEqual(operations, 20)
-        self.assertEqual(result, EffectiveFlops(neuron_operations=20))
+        # Four active membranes, plus one inactive membrane receiving an
+        # update: 5 * 5 + 3 - 3 * 1.
+        self.assertEqual(operations, 25)
+        self.assertEqual(result, EffectiveFlops(neuron_operations=25))
+
+    def test_eflops_counter_counts_inactive_lif_update(self):
+        membranes = torch.zeros(1, 1, 1)
+        updating = torch.ones_like(membranes, dtype=torch.bool)
+
+        operations = EffectiveFlopsCounter.count_lif_neurons(
+            membranes, updating
+        )
+
+        # The update activates the five-operation path, while direct
+        # assignment saves three operations: 5 + 1 - 3.
+        self.assertEqual(operations, 3)
 
     def test_counter_counts_reset_from_pre_reset_state(self):
         membranes = torch.tensor([[[0.2], [0.0]]])

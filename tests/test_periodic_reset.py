@@ -32,6 +32,7 @@ class PeriodicResetTests(unittest.TestCase):
 
     def test_non_leaky_membrane_resets_on_schedule(self):
         group = PIFGroup(tau=6e-3, shape=1)
+        group.phase.fill_(0.75)
         group.configure(
             batch_size=1,
             nb_steps=8,
@@ -39,8 +40,6 @@ class PeriodicResetTests(unittest.TestCase):
             device=torch.device("cpu"),
             dtype=torch.float32,
         )
-        group.offset.fill_(2)
-        group.reset_state()
 
         trace = []
         for _ in range(8):
@@ -57,6 +56,7 @@ class PeriodicResetTests(unittest.TestCase):
         for diff_reset in (False, True):
             with self.subTest(diff_reset=diff_reset):
                 group = PIFGroup(tau=20e-3, shape=1, diff_reset=diff_reset)
+                group.phase.fill_(0.5)
                 group.configure(
                     batch_size=1,
                     nb_steps=2,
@@ -64,8 +64,6 @@ class PeriodicResetTests(unittest.TestCase):
                     device=torch.device("cpu"),
                     dtype=torch.float32,
                 )
-                group.offset.fill_(5)
-                group.reset_state()
                 group.mem.fill_(1.1)
 
                 group.input.fill_(0.4)
@@ -90,6 +88,33 @@ class PeriodicResetTests(unittest.TestCase):
         self.assertEqual(int(group.period_steps.item()), 6)
         self.assertEqual(int(group.offset.item()), 3)
         self.assertEqual(set(group.state_dict()), {"tau", "threshold", "phase"})
+
+    def test_reset_state_refreshes_loaded_schedule(self):
+        for group_class in (PIFGroup, HeterogeneousPIFGroup):
+            with self.subTest(group_class=group_class.__name__):
+                saved = group_class(shape=2, tau=40e-3)
+                saved.tau.fill_(40e-3)
+                saved.phase.copy_(torch.tensor([0.25, 0.75]))
+
+                loaded = group_class(shape=2, tau=40e-3)
+                loaded.phase.zero_()
+                loaded.configure(
+                    batch_size=1,
+                    nb_steps=40,
+                    time_step=2e-3,
+                    device=torch.device("cpu"),
+                    dtype=torch.float32,
+                )
+                loaded.load_state_dict(saved.state_dict())
+                loaded.reset_state()
+
+                expected_periods = torch.tensor([20, 20])
+                expected_offsets = torch.tensor([5, 15])
+                self.assertTrue(torch.equal(loaded.period_steps, expected_periods))
+                self.assertTrue(torch.equal(loaded.offset, expected_offsets))
+                self.assertTrue(
+                    torch.equal(loaded.next_reset_step[0], expected_offsets)
+                )
 
     def test_initializer_uses_scalar_mean_period(self):
         torch.manual_seed(7)

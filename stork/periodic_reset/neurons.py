@@ -67,10 +67,6 @@ class HeterogeneousPIFGroup(CellGroup):
     def configure(self, batch_size, nb_steps, time_step, device, dtype):
         if time_step <= 0:
             raise ValueError("time_step must be positive")
-        self.period_steps = self._periods_in_steps(time_step, device)
-        self.offset = torch.floor(self.phase.to(device) * self.period_steps).to(
-            torch.int64
-        )
         super().configure(batch_size, nb_steps, time_step, device, dtype)
 
     def get_spike_and_reset(self, membrane_minus_threshold):
@@ -93,6 +89,10 @@ class HeterogeneousPIFGroup(CellGroup):
         self.current_step += 1
 
     def reset_state(self, batch_size=None):
+        self.period_steps = self._periods_in_steps(self.time_step, self.device)
+        self.offset = torch.floor(
+            self.phase.to(self.device) * self.period_steps
+        ).to(torch.int64)
         super().reset_state(batch_size)
         self.mem = self.get_state_tensor("mem", state=self.mem)
         self.out = self.states["out"] = torch.zeros(

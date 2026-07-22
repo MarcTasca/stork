@@ -98,8 +98,17 @@ class HeterogeneousPIFGroup(CellGroup):
         self.out = self.states["out"] = torch.zeros(
             self.int_shape, device=self.device, dtype=self.dtype
         )
-        self.next_reset_step = self.offset.expand(self.int_shape).clone()
-        self.current_step = 0
+        continue_schedule = (
+            self.stateful
+            and hasattr(self, "next_reset_step")
+            and hasattr(self, "current_step")
+            and self.next_reset_step.shape == self.int_shape
+        )
+        if not continue_schedule:
+            self.next_reset_step = (self.offset + self.period_steps).expand(
+                self.int_shape
+            ).clone()
+            self.current_step = 0
 
 
 class PIFGroup(HeterogeneousPIFGroup):

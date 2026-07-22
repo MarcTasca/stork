@@ -91,7 +91,8 @@ class EffectiveFlopsCounter:
         phases = phases.to(torch.int64)
         step_shape = (num_steps,) + (1,) * periods.ndim
         steps = torch.arange(num_steps, device=periods.device).reshape(step_shape)
-        elapsed = steps - phases.unsqueeze(0)
+        first_reset_steps = phases + periods
+        elapsed = steps - first_reset_steps.unsqueeze(0)
         schedule = (elapsed >= 0) & (
             torch.remainder(elapsed, periods.unsqueeze(0)) == 0
         )

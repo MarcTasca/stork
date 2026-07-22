@@ -27,6 +27,10 @@ class PeriodicResetFluctuationDrivenInitializer(Initializer):
         **kwargs,
     ):
         super().__init__(scaling=None, **kwargs)
+        if center_weights and self.sparseness < 1.0:
+            raise ValueError(
+                "center_weights=True is incompatible with sparse initialization"
+            )
         if nu <= 0:
             raise ValueError("nu must be positive")
         if not isinstance(tau, Real) or tau <= 0:

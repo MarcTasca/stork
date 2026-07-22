@@ -35,20 +35,24 @@ class PeriodicResetTests(unittest.TestCase):
         group.phase.fill_(0.75)
         group.configure(
             batch_size=1,
-            nb_steps=8,
+            nb_steps=11,
             time_step=2e-3,
             device=torch.device("cpu"),
             dtype=torch.float32,
         )
 
+        self.assertEqual(int(group.next_reset_step.item()), 5)
         trace = []
-        for _ in range(8):
+        for _ in range(11):
             group.input.fill_(0.1)
             group.forward()
             trace.append(round(float(group.mem.item()), 4))
 
         self.assertEqual(int(group.period_steps.item()), 3)
-        self.assertEqual(trace, [0.1, 0.2, 0.0, 0.1, 0.2, 0.0, 0.1, 0.2])
+        self.assertEqual(
+            trace,
+            [0.1, 0.2, 0.3, 0.4, 0.5, 0.0, 0.1, 0.2, 0.0, 0.1, 0.2],
+        )
         self.assertFalse(hasattr(group, "crit_accum"))
         self.assertFalse(hasattr(group, "grad_accum"))
 
@@ -89,6 +93,46 @@ class PeriodicResetTests(unittest.TestCase):
         self.assertEqual(int(group.offset.item()), 3)
         self.assertEqual(set(group.state_dict()), {"tau", "threshold", "phase"})
 
+    def test_stateful_schedule_continues_across_state_resets(self):
+        def make_group():
+            group = PIFGroup(tau=6e-3, shape=1, stateful=True)
+            group.phase.fill_(0.75)
+            group.configure(
+                batch_size=1,
+                nb_steps=11,
+                time_step=2e-3,
+                device=torch.device("cpu"),
+                dtype=torch.float32,
+            )
+            return group
+
+        def run_steps(group, num_steps):
+            trace = []
+            for _ in range(num_steps):
+                group.input.fill_(0.1)
+                group.forward()
+                trace.append(round(float(group.mem.item()), 4))
+            return trace
+
+        continuous = make_group()
+        continuous_trace = run_steps(continuous, 11)
+
+        chunked = make_group()
+        chunked_trace = run_steps(chunked, 4)
+        self.assertEqual(chunked.current_step, 4)
+        self.assertEqual(int(chunked.next_reset_step.item()), 5)
+
+        chunked.reset_state()
+        self.assertEqual(chunked.current_step, 4)
+        self.assertEqual(int(chunked.next_reset_step.item()), 5)
+        chunked_trace.extend(run_steps(chunked, 7))
+
+        self.assertEqual(chunked_trace, continuous_trace)
+        self.assertEqual(chunked.current_step, continuous.current_step)
+        self.assertTrue(
+            torch.equal(chunked.next_reset_step, continuous.next_reset_step)
+        )
+
     def test_reset_state_refreshes_loaded_schedule(self):
         for group_class in (PIFGroup, HeterogeneousPIFGroup):
             with self.subTest(group_class=group_class.__name__):
@@ -113,7 +157,10 @@ class PeriodicResetTests(unittest.TestCase):
                 self.assertTrue(torch.equal(loaded.period_steps, expected_periods))
                 self.assertTrue(torch.equal(loaded.offset, expected_offsets))
                 self.assertTrue(
-                    torch.equal(loaded.next_reset_step[0], expected_offsets)
+                    torch.equal(
+                        loaded.next_reset_step[0],
+                        expected_offsets + expected_periods,
+                    )
                 )
 
     def test_initializer_uses_scalar_mean_period(self):
@@ -154,6 +201,17 @@ class PeriodicResetTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "non-positive variance"):
             initializer.initialize(connection)
 
+    def test_initializer_rejects_centering_sparse_weights(self):
+        with self.assertRaisesRegex(
+            ValueError, "incompatible with sparse initialization"
+        ):
+            PeriodicResetFluctuationDrivenInitializer(
+                nu=15.8,
+                tau=40e-3,
+                center_weights=True,
+                sparseness=0.5,
+            )
+
     def test_eflops_counter_counts_spikes_and_periodic_updates(self):
         counter = EffectiveFlopsCounter()
         spikes = torch.tensor(
@@ -180,15 +238,15 @@ class PeriodicResetTests(unittest.TestCase):
         )
 
         expected_mask = torch.tensor(
-            [[[True, False], [False, True], [True, False], [False, False]]]
+            [[[False, False], [False, False], [True, False], [False, False]]]
         )
         self.assertTrue(torch.equal(reset_mask, expected_mask))
         self.assertEqual(counter.count_spikes(spikes), 4)
         self.assertEqual(
             result,
-            EffectiveFlops(connection_operations=6, neuron_operations=10),
+            EffectiveFlops(connection_operations=6, neuron_operations=9),
         )
-        self.assertEqual(result.total_operations, 16)
+        self.assertEqual(result.total_operations, 15)
 
     def test_eflops_counter_counts_lif_updates(self):
         membranes = torch.tensor(

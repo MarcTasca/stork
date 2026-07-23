@@ -136,9 +136,9 @@ The example notebook contains one dense 50-epoch run for each model, using seed 
 
 | model | test accuracy | total EFLOPs/sample | reduction vs LIF |
 |:--|--:|--:|--:|
-| LIF | 67.84% | 2,659,241 | baseline |
-| PIF | 72.17% | 1,574,130 | 40.81% |
-| heterogeneous PIF | 73.28% | 1,573,953 | 40.81% |
+| LIF | 70.05% | 2,761,239 | baseline |
+| PIF | 71.86% | 1,580,786 | 42.75% |
+| heterogeneous PIF | 72.13% | 1,646,858 | 40.36% |
 
 ```python
 from stork.periodic_reset import (

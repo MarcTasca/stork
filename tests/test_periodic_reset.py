@@ -81,8 +81,7 @@ class PeriodicResetTests(unittest.TestCase):
                 self.assertAlmostEqual(float(group.mem.item()), 0.2, places=7)
 
     def test_diff_reset_controls_gradient_through_spike_reset(self):
-        gradients = {}
-        for diff_reset in (False, True):
+        def gradient_from_initial_membrane(diff_reset):
             group = PIFGroup(tau=20e-3, shape=1, diff_reset=diff_reset)
             group.configure(
                 batch_size=1,
@@ -99,28 +98,37 @@ class PeriodicResetTests(unittest.TestCase):
 
             group.forward()
             group.mem.sum().backward()
-            gradients[diff_reset] = float(initial_membrane.grad.item())
+            return float(initial_membrane.grad.item())
 
-        self.assertEqual(gradients[False], 0.0)
-        self.assertNotEqual(gradients[True], 0.0)
+        detached_reset_gradient = gradient_from_initial_membrane(diff_reset=False)
+        differentiable_reset_gradient = gradient_from_initial_membrane(
+            diff_reset=True
+        )
 
-    def test_forward_preserves_configured_low_precision_dtype(self):
-        for dtype in (torch.float16, torch.bfloat16):
-            with self.subTest(dtype=dtype):
+        # The neuron spikes because its initial membrane is above threshold.
+        # Detaching the reset blocks that path; a differentiable reset keeps
+        # the surrogate spike gradient connected to the initial membrane.
+        self.assertEqual(detached_reset_gradient, 0.0)
+        self.assertNotEqual(differentiable_reset_gradient, 0.0)
+
+    def test_forward_keeps_states_in_the_configured_low_precision_dtype(self):
+        for requested_dtype in (torch.float16, torch.bfloat16):
+            with self.subTest(requested_dtype=requested_dtype):
                 group = PIFGroup(tau=20e-3, shape=1)
                 group.configure(
                     batch_size=1,
                     nb_steps=1,
                     time_step=2e-3,
                     device=torch.device("cpu"),
-                    dtype=dtype,
+                    dtype=requested_dtype,
                 )
                 group.input.fill_(0.1)
 
                 group.forward()
 
-                self.assertEqual(group.mem.dtype, dtype)
-                self.assertEqual(group.out.dtype, dtype)
+                self.assertEqual(group.threshold.dtype, requested_dtype)
+                self.assertEqual(group.mem.dtype, requested_dtype)
+                self.assertEqual(group.out.dtype, requested_dtype)
 
     def test_phase_is_preserved_when_time_step_changes(self):
         group = PIFGroup(tau=6e-3, shape=1)
@@ -205,28 +213,66 @@ class PeriodicResetTests(unittest.TestCase):
                     )
                 )
 
-    def test_stateful_reset_refreshes_schedule_after_loading(self):
+    def test_stateful_group_rebuilds_schedule_from_loaded_phase(self):
+        checkpoint_phase = torch.tensor([0.25, 0.75])
+        expected_period_steps = torch.tensor([20, 20])
+        expected_offsets = torch.tensor([5, 15])
+        expected_next_reset_steps = torch.tensor([25, 35])
+
         for group_class in (PIFGroup, HeterogeneousPIFGroup):
             with self.subTest(group_class=group_class.__name__):
-                saved = group_class(shape=2, tau=40e-3, stateful=True)
-                saved.tau.fill_(40e-3)
-                saved.phase.copy_(torch.tensor([0.25, 0.75]))
+                checkpoint_group = group_class(
+                    shape=2, tau=40e-3, stateful=True
+                )
+                checkpoint_group.tau.fill_(40e-3)
+                checkpoint_group.phase.copy_(checkpoint_phase)
 
-                loaded = group_class(shape=2, tau=40e-3, stateful=True)
-                loaded.phase.zero_()
-                loaded.configure(
+                restored_group = group_class(
+                    shape=2, tau=40e-3, stateful=True
+                )
+                restored_group.tau.fill_(40e-3)
+                restored_group.phase.zero_()
+                restored_group.configure(
                     batch_size=1,
                     nb_steps=40,
                     time_step=2e-3,
                     device=torch.device("cpu"),
                     dtype=torch.float32,
                 )
-                loaded.load_state_dict(saved.state_dict())
-                loaded.reset_state()
+                for _ in range(3):
+                    restored_group.forward()
 
-                expected_next_reset = torch.tensor([25, 35])
-                self.assertTrue(
-                    torch.equal(loaded.next_reset_step[0], expected_next_reset)
+                self.assertEqual(restored_group.current_step, 3)
+                torch.testing.assert_close(
+                    restored_group.next_reset_step[0],
+                    torch.tensor([20, 20]),
+                    rtol=0,
+                    atol=0,
+                )
+
+                restored_group.load_state_dict(checkpoint_group.state_dict())
+                restored_group.reset_state()
+
+                # Loading changes the phase-derived offsets. The old stateful
+                # timeline must restart rather than continue with [20, 20].
+                self.assertEqual(restored_group.current_step, 0)
+                torch.testing.assert_close(
+                    restored_group.period_steps,
+                    expected_period_steps,
+                    rtol=0,
+                    atol=0,
+                )
+                torch.testing.assert_close(
+                    restored_group.offset,
+                    expected_offsets,
+                    rtol=0,
+                    atol=0,
+                )
+                torch.testing.assert_close(
+                    restored_group.next_reset_step[0],
+                    expected_next_reset_steps,
+                    rtol=0,
+                    atol=0,
                 )
 
     def test_initializer_uses_scalar_mean_period(self):
@@ -356,7 +402,7 @@ class PeriodicResetTests(unittest.TestCase):
         # reset operation applies to the active state from the previous step.
         self.assertEqual(operations, 1)
 
-    def test_periodic_reset_mask_repeats_across_batch(self):
+    def test_periodic_reset_mask_is_identical_for_every_batch_item(self):
         mask = EffectiveFlopsCounter.periodic_reset_mask(
             period_steps=torch.tensor([2, 3]),
             offsets=torch.tensor([0, 1]),
@@ -364,16 +410,26 @@ class PeriodicResetTests(unittest.TestCase):
             batch_size=3,
         )
 
-        self.assertEqual(mask.shape, (3, 7, 2))
-        self.assertTrue(torch.equal(mask[0], mask[1]))
-        self.assertTrue(torch.equal(mask[1], mask[2]))
-        self.assertEqual(
-            mask[0, :, 0].tolist(),
-            [False, False, True, False, True, False, True],
+        # Neuron 0 first resets at step 2 and repeats every 2 steps. Neuron 1
+        # has offset 1, so it first resets at 1 + 3 = step 4.
+        expected_single_item = torch.tensor(
+            [
+                [False, False],
+                [False, False],
+                [True, False],
+                [False, False],
+                [True, True],
+                [False, False],
+                [True, False],
+            ]
         )
-        self.assertEqual(
-            mask[0, :, 1].tolist(),
-            [False, False, False, False, True, False, False],
+        expected_batch = expected_single_item.unsqueeze(0).expand(3, -1, -1)
+
+        torch.testing.assert_close(
+            mask,
+            expected_batch,
+            rtol=0,
+            atol=0,
         )
 
     def test_non_leaky_readout_accumulates_without_decay(self):

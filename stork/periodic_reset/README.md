@@ -19,7 +19,7 @@ s_{n,j}=\mathbf{1}[u_{n,j}>\theta_j],
 u_{n+1,j}=(u_{n,j}+I_{n,j})(1-s_{n,j})(1-r_{n,j}).
 $$
 
-Therefore, the neuron is reset to zero after a spike or at a scheduled reset. 
+Therefore, the neuron is reset to zero after a spike or at a scheduled reset.
 
 To calculate the scheduled reset we convert the neuron reset period $\tau_j$ to an integer number of simulation steps $p_j$ and, to avoid simultaneous resets, we assign at every neuron $j$ an independent phase:
 

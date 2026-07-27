@@ -1,0 +1,4 @@
+interface:
+  display_name: "Stork PR Review"
+  short_description: "Review Stork PRs for scientific correctness"
+  default_prompt: "Use $stork-pr-review to review the current branch against origin/main without modifying files."

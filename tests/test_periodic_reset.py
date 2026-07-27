@@ -80,6 +80,48 @@ class PeriodicResetTests(unittest.TestCase):
                 self.assertEqual(float(group.out.item()), 0.0)
                 self.assertAlmostEqual(float(group.mem.item()), 0.2, places=7)
 
+    def test_diff_reset_controls_gradient_through_spike_reset(self):
+        gradients = {}
+        for diff_reset in (False, True):
+            group = PIFGroup(tau=20e-3, shape=1, diff_reset=diff_reset)
+            group.configure(
+                batch_size=1,
+                nb_steps=1,
+                time_step=2e-3,
+                device=torch.device("cpu"),
+                dtype=torch.float64,
+            )
+            initial_membrane = torch.tensor(
+                [[1.1]], dtype=torch.float64, requires_grad=True
+            )
+            group.mem = group.states["mem"] = initial_membrane
+            group.input.fill_(0.2)
+
+            group.forward()
+            group.mem.sum().backward()
+            gradients[diff_reset] = float(initial_membrane.grad.item())
+
+        self.assertEqual(gradients[False], 0.0)
+        self.assertNotEqual(gradients[True], 0.0)
+
+    def test_forward_preserves_configured_low_precision_dtype(self):
+        for dtype in (torch.float16, torch.bfloat16):
+            with self.subTest(dtype=dtype):
+                group = PIFGroup(tau=20e-3, shape=1)
+                group.configure(
+                    batch_size=1,
+                    nb_steps=1,
+                    time_step=2e-3,
+                    device=torch.device("cpu"),
+                    dtype=dtype,
+                )
+                group.input.fill_(0.1)
+
+                group.forward()
+
+                self.assertEqual(group.mem.dtype, dtype)
+                self.assertEqual(group.out.dtype, dtype)
+
     def test_phase_is_preserved_when_time_step_changes(self):
         group = PIFGroup(tau=6e-3, shape=1)
         group.phase.fill_(0.5)
@@ -161,6 +203,30 @@ class PeriodicResetTests(unittest.TestCase):
                         loaded.next_reset_step[0],
                         expected_offsets + expected_periods,
                     )
+                )
+
+    def test_stateful_reset_refreshes_schedule_after_loading(self):
+        for group_class in (PIFGroup, HeterogeneousPIFGroup):
+            with self.subTest(group_class=group_class.__name__):
+                saved = group_class(shape=2, tau=40e-3, stateful=True)
+                saved.tau.fill_(40e-3)
+                saved.phase.copy_(torch.tensor([0.25, 0.75]))
+
+                loaded = group_class(shape=2, tau=40e-3, stateful=True)
+                loaded.phase.zero_()
+                loaded.configure(
+                    batch_size=1,
+                    nb_steps=40,
+                    time_step=2e-3,
+                    device=torch.device("cpu"),
+                    dtype=torch.float32,
+                )
+                loaded.load_state_dict(saved.state_dict())
+                loaded.reset_state()
+
+                expected_next_reset = torch.tensor([25, 35])
+                self.assertTrue(
+                    torch.equal(loaded.next_reset_step[0], expected_next_reset)
                 )
 
     def test_initializer_uses_scalar_mean_period(self):
@@ -289,6 +355,26 @@ class PeriodicResetTests(unittest.TestCase):
         # The membrane stored at the reset step is already zero. The one
         # reset operation applies to the active state from the previous step.
         self.assertEqual(operations, 1)
+
+    def test_periodic_reset_mask_repeats_across_batch(self):
+        mask = EffectiveFlopsCounter.periodic_reset_mask(
+            period_steps=torch.tensor([2, 3]),
+            offsets=torch.tensor([0, 1]),
+            num_steps=7,
+            batch_size=3,
+        )
+
+        self.assertEqual(mask.shape, (3, 7, 2))
+        self.assertTrue(torch.equal(mask[0], mask[1]))
+        self.assertTrue(torch.equal(mask[1], mask[2]))
+        self.assertEqual(
+            mask[0, :, 0].tolist(),
+            [False, False, True, False, True, False, True],
+        )
+        self.assertEqual(
+            mask[0, :, 1].tolist(),
+            [False, False, False, False, True, False, False],
+        )
 
     def test_non_leaky_readout_accumulates_without_decay(self):
         group = NonLeakyReadoutGroup(shape=2, gamma=0.5, initial_state=-1e-3)

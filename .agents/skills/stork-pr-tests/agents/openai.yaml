@@ -1,0 +1,4 @@
+interface:
+  display_name: "Stork PR Tests"
+  short_description: "Add high-signal scientific tests to Stork PRs"
+  default_prompt: "Use $stork-pr-tests to add high-signal tests for the current branch against origin/main."

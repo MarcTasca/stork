@@ -122,3 +122,6 @@ dmypy.json
 
 # Datasets
 data/
+
+# Local Codex agent skills
+.agents/

@@ -6,7 +6,6 @@ setup(
     description="Surrogate gradient library based on pytorch",
     author="Friedemann Zenke",
     author_email="fzenke@gmail.com",
-    license="MIT",
     packages=find_packages(),
     zip_safe=False,
 )

@@ -162,6 +162,8 @@ initializer = PeriodicResetFluctuationDrivenInitializer(
 
 The counter follows the zero-skipping idea from Narduzzi et al. (2025). An operation is counted when its operands are active and nonzero. Binary spikes select weight additions, so an active nonzero connection costs one operation. The counter also includes neuron-state updates and readout updates.
 
+For LIF layers, synaptic-state activity is not tracked separately. Membrane activity is used as a proxy for joint membrane and synaptic dynamics, and the five-operation active-state factor includes both. Under this simplified analytical convention, an active membrane costs five operations, an active membrane receiving an update costs six, an inactive membrane receiving an update costs three after direct-assignment savings, and a fully inactive neuron costs zero.
+
 The PIF rules add the cost of a scheduled reset when the membrane was active. The non-leaky readout rules are another small extension. These two extensions are specific to this package; they are not equations copied from the paper.
 
 The returned total is

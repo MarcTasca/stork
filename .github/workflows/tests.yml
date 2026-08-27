@@ -24,18 +24,21 @@ jobs:
 
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
-      - name: Install uv and Python
-        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      - name: Set up Python
+        uses: actions/setup-python@v7
         with:
-          enable-cache: true
           python-version: ${{ matrix.python-version }}
+          cache: pip
 
-      - name: Install locked dependencies
-        run: uv sync --locked
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
 
       - name: Run the unit tests
         env:
           MPLCONFIGDIR: ${{ runner.temp }}/matplotlib
-        run: uv run --locked python -m unittest discover -s tests -v
+        run: python -m unittest discover -s tests -v

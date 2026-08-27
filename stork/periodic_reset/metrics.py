@@ -142,11 +142,12 @@ class EffectiveFlopsCounter:
     def count_lif_neurons(membranes, updating):
         """Count leaky integrate-and-fire neuron operations.
 
-        Tensors use ``(batch, time, ...)`` layout. The count follows the LIF
-        state-update convention of five operations when either the membrane
-        or incoming update is active, plus one operation per incoming update.
-        Three operations are saved when an inactive membrane receives an
-        update directly.
+        Tensors use ``(batch, time, ...)`` layout. Synaptic-current activity is
+        not tracked separately: membrane activity is the proxy for joint
+        membrane and synaptic dynamics, and the five-operation active-state
+        factor includes both. An incoming update adds one operation. When an
+        inactive membrane receives an update, direct assignment saves three
+        operations.
         """
 
         if membranes.ndim < 2:

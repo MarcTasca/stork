@@ -1,4 +1,5 @@
 numpy
+pandas
 torch
 scipy
 matplotlib      # plotting

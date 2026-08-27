@@ -389,6 +389,18 @@ class PeriodicResetTests(unittest.TestCase):
         # assignment saves three operations: 5 + 1 - 3.
         self.assertEqual(operations, 3)
 
+    def test_lif_counter_bundles_membrane_and_synaptic_activity(self):
+        membranes = torch.tensor([[[1.0, 1.0, 0.0, 0.0]]])
+        updating = torch.tensor([[[False, True, True, False]]])
+
+        operations = EffectiveFlopsCounter.count_lif_neurons(
+            membranes, updating
+        )
+
+        # The four states cost 5, 6, 3, and 0 operations respectively. The
+        # active-membrane factor includes assumed synaptic-current dynamics.
+        self.assertEqual(operations, 14)
+
     def test_counter_counts_reset_from_pre_reset_state(self):
         membranes = torch.tensor([[[0.2], [0.0]]])
         updating = torch.zeros_like(membranes, dtype=torch.bool)

@@ -1,4 +1,4 @@
-# PIF: periodic reset-and-fire neurons
+# PIF: Periodic Integrate-and-Fire neurons
 
 PIF is a lightweight alternative to a leaky integrate-and-fire (LIF) neuron. A LIF neuron keeps leaky membrane and synaptic states. A PIF neuron keeps one non-leaky membrane and clears it at fixed times. This removes the decay operations while still preventing the membrane from growing forever.
 

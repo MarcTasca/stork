@@ -3,7 +3,7 @@
 # Stork
 
 Stork is a library designed for the training of spiking neural networks (SNNs). In contrast to conventional deep learning methods, SNNs operate on spikes instead of continuous activation functions, this is why stork extends PyTorch's auto-differentiation capabilities with surrogate gradients (<a href="https://direct.mit.edu/neco/article-abstract/30/6/1514/8378/SuperSpike-Supervised-Learning-in-Multilayer?redirectedFrom=fulltext">Zenke & Ganguli, 2018</a>) to enable the training of SNNs with backpropagation through time (BPTT).  
-Stork supports leaky integrate-and-fire (LIF) neurons including adaptive LIF neurons, as well as homogeneous and heterogeneous periodic reset-and-fire (PIF) neurons. It provides different kinds of synaptic connections for constructing Dalian, convolutional, recurrent, and skip-connected networks. For each neuron group, customizable activity regularizers are available to e.g. apply homeostatic plasticity.
+Stork supports leaky integrate-and-fire (LIF) neurons including adaptive LIF neurons, as well as homogeneous and heterogeneous periodic integrate-and-fire (PIF) neurons. It provides different kinds of synaptic connections for constructing Dalian, convolutional, recurrent, and skip-connected networks. For each neuron group, customizable activity regularizers are available to e.g. apply homeostatic plasticity.
 Furthermore, stork uses per default initialization in the fluctuation-driven regime, what enhances SNN training especially in deep networks.
 
 
